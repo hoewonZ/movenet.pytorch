@@ -229,11 +229,11 @@ class MovenetLoss(torch.nn.Module):
         # cv2.imwrite("t.jpg", target[0][2].cpu().numpy()*255)
         loss = 0
         for idx in range(num_joints):
-
+            # 取出在x 、y通道上，中心点坐标位置的偏移值
             gt_x = target[_dim0,_dim1+idx*2,cy0,cx0]
             gt_y = target[_dim0,_dim1+idx*2+1,cy0,cx0]
             
-            
+            # 再取出预测x、y通道上真实中心点坐标位置上预测的偏移值。
             pre_x = pred[_dim0,_dim1+idx*2,cy0,cx0]
             pre_y = pred[_dim0,_dim1+idx*2+1,cy0,cx0]
 

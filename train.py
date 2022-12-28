@@ -3,7 +3,6 @@
 https://github.com/fire717
 """
 from lib import init, Data, MoveNet, Task
-
 from config import cfg
 
 

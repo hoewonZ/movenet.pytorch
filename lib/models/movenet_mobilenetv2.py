@@ -69,10 +69,10 @@ def dw_conv3(inp, oup, stride=1):
 
 def upsample(inp, oup, scale=2):
     return nn.Sequential(
-                nn.Conv2d(inp, inp, 3, 1, 1, groups=inp),
+                nn.Conv2d(inp, inp, 3, 1, 1, groups=inp),# 进一步融合，每次融合前又做了一次dw进行学习
                 nn.ReLU(inplace=True),
-                conv_1x1_act2(inp,oup),
-                nn.Upsample(scale_factor=scale, mode='bilinear', align_corners=False))
+                conv_1x1_act2(inp,oup),# 改通道
+                nn.Upsample(scale_factor=scale, mode='bilinear', align_corners=False)) # 上采样
 
 
 def IRBlock(oup, hidden_dim):
@@ -157,7 +157,7 @@ class Backbone(nn.Module):
         self.features1 = nn.Sequential(*[
                             conv_3x3_act(3, input_channel, 2),
                             dw_conv(input_channel, 16, 1),
-                            InvertedResidual(16, 24, 2, 6, 1)
+                            InvertedResidual(16, 24, 2, 6, 1) # i o s t n
                         ])
 
         self.features2 = InvertedResidual(24, 32, 2, 6, 2)
@@ -168,15 +168,15 @@ class Backbone(nn.Module):
                             InvertedResidual(96, 160, 2, 6, 2),
                             InvertedResidual(160, 320, 1, 6, 0),
                             conv_1x1_act(320,1280),
-                            nn.Conv2d(1280, 64, 1, 1, 0, bias=False),
-                            nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False)
+                            nn.Conv2d(1280, 64, 1, 1, 0, bias=False),# 特征压缩回64通道，为了上采样融合特征，当前hw=7，c=64
+                            nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False) # 膨胀后hw=14,c =64
                         ])
 
 
         self.upsample2 = upsample(64, 32)
         self.upsample1 = upsample(32, 24)
 
-        self.conv3 = nn.Conv2d(64, 64, 1, 1, 0)
+        self.conv3 = nn.Conv2d(64, 64, 1, 1, 0) # 就是1卷积
         self.conv2 = nn.Conv2d(32, 32, 1, 1, 0)
         self.conv1 = nn.Conv2d(24, 24, 1, 1, 0)
 
@@ -197,22 +197,22 @@ class Backbone(nn.Module):
         f3 = self.features3(f2)
         #print(f3.shape)#[1, 64, 12, 12]
 
-        f4 = self.features4(f3)
-        f3 = self.conv3(f3)
+        f4 = self.features4(f3) # feature4内部已经经过一次upsample了，所以输出shape和通道和f3一样了
+        f3 = self.conv3(f3) # 做了一次1x1,这应该是fpn的路子
         #print(f4.shape)#[1, 64, 12, 12]
-        f4 += f3
+        f4 += f3 # f3 f4融合
 
-        f4 = self.upsample2(f4)
-        f2 = self.conv2(f2)
-        f4 += f2
+        f4 = self.upsample2(f4) # f3 34融合的结果上采样
+        f2 = self.conv2(f2) # f2 作一次1x1
+        f4 += f2 # f4再融合f2
 
-        f4 = self.upsample1(f4)
-        f1 = self.conv1(f1)
-        f4 += f1
+        f4 = self.upsample1(f4) # f234 融合结果上采样
+        f1 = self.conv1(f1) #f1 1x1
+        f4 += f1 # f4在融合f1，完成f4融合3次特征。
 
-        f4 = self.conv4(f4)
+        f4 = self.conv4(f4) # 自己又做了一次dw，但是这里维度不变，应该有提取了一次特征。
 
-        return f4
+        return f4 # 融合最终的f4交给了header
 
 
 
@@ -368,14 +368,15 @@ class MoveNet(nn.Module):
 if __name__ == "__main__":
     from torchsummary import summary
 
-    model = MoveNet().cuda()
-    print(summary(model, (3, 192, 192)))
-
-
-    dummy_input1 = torch.randn(1, 3, 192, 192).cuda()
-    input_names = [ "input1"] #自己命名
-    output_names = [ "output1" ]
-    
-    torch.onnx.export(model, dummy_input1, "pose.onnx", 
-        verbose=True, input_names=input_names, output_names=output_names,
-        do_constant_folding=True,opset_version=11)
+    # model = MoveNet().cuda()
+    print(MoveNet())
+    # print(summary(model, (3, 192, 192)))
+    #
+    #
+    # dummy_input1 = torch.randn(1, 3, 192, 192).cuda()
+    # input_names = [ "input1"] #自己命名
+    # output_names = [ "output1" ]
+    #
+    # torch.onnx.export(model, dummy_input1, "pose.onnx",
+    #     verbose=True, input_names=input_names, output_names=output_names,
+    #     do_constant_folding=True,opset_version=11)

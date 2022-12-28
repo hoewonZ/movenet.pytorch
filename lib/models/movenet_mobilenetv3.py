@@ -140,7 +140,7 @@ class InvertedResidual(nn.Module):
         padding: int = 0,
         bias: bool = False
     ) -> nn.Conv2d:
-        return nn.Conv2d(i, o, kernel_size, stride, padding, bias=bias, groups=i)
+        return nn.Conv2d(i, o, kernel_size, stride, padding, bias=bias, groups=i) # group =1 就是普通卷积，其他值就是dw卷积，官方定义,o=i=groups 就是dw卷积
 
     def forward(self, x):
         if self.stride == 1:
@@ -369,14 +369,16 @@ if __name__ == "__main__":
     from torchsummary import summary
     import os
     os.environ["CUDA_VISIBLE_DEVICES"] = '1'
-    model = MoveNet().cuda()
-    print(summary(model, (3, 192, 192)))
-
-
-    dummy_input1 = torch.randn(1, 3, 192, 192).cuda()
-    input_names = [ "input1"] #自己命名
-    output_names = [ "output1" ]
-    
-    torch.onnx.export(model, dummy_input1, "pose.onnx", 
-        verbose=True, input_names=input_names, output_names=output_names,
-        do_constant_folding=True, opset_version=11)
+    # model = MoveNet().cuda()
+    model = MoveNet()
+    print(model)
+    # print(summary(model, (3, 192, 192)))
+    #
+    #
+    # dummy_input1 = torch.randn(1, 3, 192, 192).cuda()
+    # input_names = [ "input1"] #自己命名
+    # output_names = [ "output1" ]
+    #
+    # torch.onnx.export(model, dummy_input1, "pose.onnx",
+    #     verbose=True, input_names=input_names, output_names=output_names,
+    #     do_constant_folding=True, opset_version=11)
